@@ -146,6 +146,11 @@
             border: none;
             background: white;
         }
+        .artplayer-app {
+            width: 80vw;
+            height: 60vh;
+            max-width: 1000px;
+        }
         .close-modal {
             position: absolute;
             top: -40px;
@@ -200,9 +205,11 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
     <script>
         let currentPath = '';
         let adminPassword = '';
+        let art = null;
 
         function loginAdmin() {
             const pass = document.getElementById('adminPassword').value;
@@ -294,7 +301,7 @@
                 const date = new Date(item.mtime).toLocaleString();
                 const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
 
-                const isPreviewable = !item.isDirectory && ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.pdf', '.txt'].includes(item.ext);
+                const isPreviewable = !item.isDirectory && ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mkv', '.webm', '.pdf', '.txt'].includes(item.ext);
 
                 tr.innerHTML = `
                     <td>
@@ -324,7 +331,7 @@
             window.location.href = `/api/download?path=${encodeURIComponent(path)}`;
         }
 
-        function openPreview(path, ext) {
+        async function openPreview(path, ext) {
             const modal = document.getElementById('previewModal');
             const container = document.getElementById('preview-container');
             container.innerHTML = '';
@@ -333,8 +340,82 @@
 
             if (['.png', '.jpg', '.jpeg', '.gif'].includes(ext)) {
                 container.innerHTML = `<img src="${viewUrl}" alt="Preview">`;
-            } else if (ext === '.mp4') {
-                container.innerHTML = `<video src="${viewUrl}" controls autoplay></video>`;
+            } else if (['.mp4', '.mkv', '.webm'].includes(ext)) {
+                container.innerHTML = `<div class="artplayer-app"></div>`;
+                
+                try {
+                    const infoRes = await fetch(`/api/media-info?path=${encodeURIComponent(path)}`);
+                    const info = await infoRes.json();
+                    
+                    const subtitleTracks = info.streams
+                        .filter(s => s.type === 'subtitle')
+                        .map(s => ({
+                            html: s.title || `Subtitle ${s.index} (${s.language})`,
+                            url: `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`,
+                            name: s.title || `Subtitle ${s.index}`
+                        }));
+
+                    art = new Artplayer({
+                        container: '.artplayer-app',
+                        url: viewUrl,
+                        type: ext === '.mkv' ? 'mkv' : (ext === '.mp4' ? 'mp4' : 'webm'),
+                        title: path.split('/').pop(),
+                        autoplay: true,
+                        pip: true,
+                        screenshot: true,
+                        setting: true,
+                        loop: true,
+                        flip: true,
+                        playbackRate: true,
+                        aspectRatio: true,
+                        fullscreen: true,
+                        fullscreenWeb: true,
+                        subtitleOffset: true,
+                        miniProgressBar: true,
+                        mutex: true,
+                        backdrop: true,
+                        playsInline: true,
+                        autoPlayback: true,
+                        airplay: true,
+                        subtitle: subtitleTracks.length > 0 ? {
+                            url: subtitleTracks[0].url,
+                            type: 'srt',
+                            style: {
+                                color: '#fff',
+                                fontSize: '20px',
+                            },
+                            encoding: 'utf-8',
+                        } : {},
+                        settings: [
+                            {
+                                width: 200,
+                                html: 'Subtitles',
+                                tooltip: subtitleTracks.length > 0 ? subtitleTracks[0].name : 'None',
+                                selector: [
+                                    {
+                                        html: 'Off',
+                                        url: '',
+                                    },
+                                    ...subtitleTracks
+                                ],
+                                onSelect: function (item) {
+                                    if (item.url) {
+                                        art.subtitle.switch(item.url, {
+                                            name: item.name,
+                                            type: 'srt',
+                                        });
+                                    } else {
+                                        art.subtitle.show = false;
+                                    }
+                                    return item.html;
+                                },
+                            },
+                        ],
+                    });
+                } catch (err) {
+                    console.error('Failed to load media info', err);
+                    container.innerHTML = `<video src="${viewUrl}" controls autoplay style="max-width:100%"></video>`;
+                }
             } else if (ext === '.pdf' || ext === '.txt') {
                 container.innerHTML = `<iframe src="${viewUrl}"></iframe>`;
             }
@@ -345,7 +426,11 @@
         function closePreview() {
             const modal = document.getElementById('previewModal');
             const container = document.getElementById('preview-container');
-            container.innerHTML = ''; // Stop video if playing
+            if (art) {
+                art.destroy();
+                art = null;
+            }
+            container.innerHTML = ''; 
             modal.style.display = 'none';
         }
 

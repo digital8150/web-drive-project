@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const ffmpeg = require('fluent-ffmpeg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,6 +51,53 @@ const resolvePath = (requestedPath = '') => {
     }
     return resolvedPath;
 };
+
+// API: Media Info (Tracks)
+app.get('/api/media-info', (req, res) => {
+    try {
+        const filePath = req.query.path;
+        if (!filePath) return res.status(400).json({ error: 'Path is required' });
+
+        const targetPath = resolvePath(filePath);
+        ffmpeg.ffprobe(targetPath, (err, metadata) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            const streams = metadata.streams.map(s => ({
+                index: s.index,
+                type: s.codec_type,
+                codec: s.codec_name,
+                language: s.tags ? s.tags.language : 'unknown',
+                title: s.tags ? s.tags.title : (s.codec_type + ' ' + s.index)
+            }));
+
+            res.json({ streams });
+        });
+    } catch (err) {
+        res.status(403).json({ error: err.message });
+    }
+});
+
+// API: Subtitle Extraction (SRT)
+app.get('/api/subtitle', (req, res) => {
+    try {
+        const filePath = req.query.path;
+        const trackIndex = req.query.index;
+        if (!filePath || trackIndex === undefined) return res.status(400).json({ error: 'Path and index are required' });
+
+        const targetPath = resolvePath(filePath);
+        
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        ffmpeg(targetPath)
+            .outputOptions([`-map 0:${trackIndex}`, '-f srt'])
+            .on('error', (err) => {
+                console.error('Subtitle extraction error:', err);
+                if (!res.headersSent) res.status(500).send(err.message);
+            })
+            .pipe(res, { end: true });
+    } catch (err) {
+        res.status(403).json({ error: err.message });
+    }
+});
 
 // API: List files and directories
 app.get('/api/files', (req, res) => {
@@ -165,9 +213,13 @@ function getMimeType(filePath) {
         '.svg': 'image/svg+xml',
         '.wav': 'audio/wav',
         '.mp4': 'video/mp4',
+        '.mkv': 'video/x-matroska',
+        '.webm': 'video/webm',
         '.mp3': 'audio/mpeg',
         '.pdf': 'application/pdf',
         '.txt': 'text/plain',
+        '.vtt': 'text/vtt',
+        '.srt': 'text/plain',
     };
     return mimeTypes[ext] || 'application/octet-stream';
 }
