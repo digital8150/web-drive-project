@@ -77,6 +77,68 @@ app.get('/api/download', (req, res) => {
     }
 });
 
+// API: Stream or Preview file
+app.get('/api/view', (req, res) => {
+    try {
+        const filePath = req.query.path;
+        if (!filePath) return res.status(400).json({ error: 'Path is required' });
+
+        const targetPath = resolvePath(filePath);
+        if (!fs.existsSync(targetPath) || fs.statSync(targetPath).isDirectory()) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+
+        const stat = fs.statSync(targetPath);
+        const fileSize = stat.size;
+        const range = req.headers.range;
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunksize = (end - start) + 1;
+            const file = fs.createReadStream(targetPath, { start, end });
+            const head = {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': getMimeType(targetPath),
+            };
+            res.writeHead(206, head);
+            file.pipe(res);
+        } else {
+            const head = {
+                'Content-Length': fileSize,
+                'Content-Type': getMimeType(targetPath),
+            };
+            res.writeHead(200, head);
+            fs.createReadStream(targetPath).pipe(res);
+        }
+    } catch (err) {
+        res.status(403).json({ error: err.message });
+    }
+});
+
+function getMimeType(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+        '.html': 'text/html',
+        '.js': 'text/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.wav': 'audio/wav',
+        '.mp4': 'video/mp4',
+        '.mp3': 'audio/mpeg',
+        '.pdf': 'application/pdf',
+        '.txt': 'text/plain',
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+}
+
 app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'LiteDrive Server is running', rootPath: DATA_PATH });
 });

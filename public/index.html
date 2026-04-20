@@ -79,6 +79,48 @@
             cursor: pointer;
             color: var(--primary-color);
             font-size: 0.9em;
+            margin-right: 5px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+        .modal-content {
+            position: relative;
+            margin: auto;
+            top: 50%;
+            transform: translateY(-50%);
+            max-width: 90%;
+            max-height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content img, .modal-content video {
+            max-width: 100%;
+            max-height: 80vh;
+        }
+        .modal-content iframe {
+            width: 80vw;
+            height: 80vh;
+            border: none;
+            background: white;
+        }
+        .close-modal {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -107,6 +149,13 @@
                     <!-- Files will be loaded here -->
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div id="previewModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closePreview()">&times;</span>
+            <div id="preview-container"></div>
         </div>
     </div>
 
@@ -165,14 +214,17 @@
                 const date = new Date(item.mtime).toLocaleString();
                 const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
 
+                const isPreviewable = !item.isDirectory && ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.pdf', '.txt'].includes(item.ext);
+
                 tr.innerHTML = `
                     <td>
                         <span class="icon">${icon}</span>
-                        <a href="#" class="item-name" onclick="${item.isDirectory ? `fetchFiles('${itemFullPath}')` : `downloadFile('${itemFullPath}')`}">${item.name}</a>
+                        <a href="#" class="item-name" onclick="${item.isDirectory ? `fetchFiles('${itemFullPath}')` : (isPreviewable ? `openPreview('${itemFullPath}', '${item.ext}')` : `downloadFile('${itemFullPath}')`)}">${item.name}</a>
                     </td>
                     <td>${size}</td>
                     <td>${date}</td>
                     <td class="actions">
+                        ${isPreviewable ? `<button onclick="openPreview('${itemFullPath}', '${item.ext}')">View</button>` : ''}
                         ${item.isDirectory ? '' : `<button onclick="downloadFile('${itemFullPath}')">Download</button>`}
                     </td>
                 `;
@@ -190,6 +242,38 @@
 
         function downloadFile(path) {
             window.location.href = `/api/download?path=${encodeURIComponent(path)}`;
+        }
+
+        function openPreview(path, ext) {
+            const modal = document.getElementById('previewModal');
+            const container = document.getElementById('preview-container');
+            container.innerHTML = '';
+            
+            const viewUrl = `/api/view?path=${encodeURIComponent(path)}`;
+
+            if (['.png', '.jpg', '.jpeg', '.gif'].includes(ext)) {
+                container.innerHTML = `<img src="${viewUrl}" alt="Preview">`;
+            } else if (ext === '.mp4') {
+                container.innerHTML = `<video src="${viewUrl}" controls autoplay></video>`;
+            } else if (ext === '.pdf' || ext === '.txt') {
+                container.innerHTML = `<iframe src="${viewUrl}"></iframe>`;
+            }
+
+            modal.style.display = 'block';
+        }
+
+        function closePreview() {
+            const modal = document.getElementById('previewModal');
+            const container = document.getElementById('preview-container');
+            container.innerHTML = ''; // Stop video if playing
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('previewModal');
+            if (event.target == modal) {
+                closePreview();
+            }
         }
 
         // Initial load
