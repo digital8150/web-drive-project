@@ -24,7 +24,10 @@ const storage = multer.diskStorage({
         cb(null, Date.now() + '-' + file.originalname);
     }
 });
-const upload = multer({ storage });
+const upload = multer({ 
+    storage,
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
@@ -171,6 +174,17 @@ function getMimeType(filePath) {
 
 app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'LiteDrive Server is running', rootPath: DATA_PATH });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'File size too large (Limit: 100MB)' });
+        }
+    }
+    res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
 app.listen(PORT, () => {
