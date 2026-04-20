@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteDrive - File Explorer</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --card-bg: #fff;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .breadcrumb {
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .breadcrumb span {
+            cursor: pointer;
+            color: var(--primary-color);
+        }
+        .file-list {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #fafafa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+        .icon {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+            display: inline-block;
+        }
+        .item-name {
+            cursor: pointer;
+            color: var(--text-color);
+            text-decoration: none;
+        }
+        .item-name:hover {
+            color: var(--primary-color);
+        }
+        .actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary-color);
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📂 LiteDrive</h1>
+            <div id="status">Connecting...</div>
+        </header>
+
+        <div class="breadcrumb" id="breadcrumb">
+            Root
+        </div>
+
+        <div class="file-list">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Modified</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="file-table-body">
+                    <!-- Files will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentPath = '';
+
+        async function fetchFiles(path = '') {
+            try {
+                const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                currentPath = data.currentPath;
+                renderBreadcrumb();
+                renderFiles(data.items);
+            } catch (err) {
+                console.error('Failed to fetch files', err);
+            }
+        }
+
+        function renderBreadcrumb() {
+            const container = document.getElementById('breadcrumb');
+            const parts = currentPath.split('/').filter(p => p);
+            let html = '<span onclick="fetchFiles(\'\')">Root</span>';
+            let pathAcc = '';
+            parts.forEach((part, index) => {
+                pathAcc += (index === 0 ? '' : '/') + part;
+                const currentAcc = pathAcc;
+                html += ` / <span onclick="fetchFiles('${currentAcc}')">${part}</span>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderFiles(items) {
+            const tbody = document.getElementById('file-table-body');
+            tbody.innerHTML = '';
+
+            if (currentPath !== '') {
+                const parentPath = currentPath.split('/').slice(0, -1).join('/');
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td colspan="4">
+                        <span class="icon">⤴️</span>
+                        <a href="#" class="item-name" onclick="fetchFiles('${parentPath}')">.. (Parent Directory)</a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                const icon = item.isDirectory ? '📁' : '📄';
+                const size = item.isDirectory ? '-' : formatSize(item.size);
+                const date = new Date(item.mtime).toLocaleString();
+                const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
+
+                tr.innerHTML = `
+                    <td>
+                        <span class="icon">${icon}</span>
+                        <a href="#" class="item-name" onclick="${item.isDirectory ? `fetchFiles('${itemFullPath}')` : `downloadFile('${itemFullPath}')`}">${item.name}</a>
+                    </td>
+                    <td>${size}</td>
+                    <td>${date}</td>
+                    <td class="actions">
+                        ${item.isDirectory ? '' : `<button onclick="downloadFile('${itemFullPath}')">Download</button>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function downloadFile(path) {
+            window.location.href = `/api/download?path=${encodeURIComponent(path)}`;
+        }
+
+        // Initial load
+        fetchFiles();
+        
+        // Status check
+        fetch('/api/status')
+            .then(r => r.json())
+            .then(d => document.getElementById('status').innerText = 'Online')
+            .catch(e => document.getElementById('status').innerText = 'Offline');
+    </script>
+</body>
+</html>
