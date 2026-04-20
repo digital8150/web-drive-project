@@ -22,6 +22,7 @@
             --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
             --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             --sidebar-width: 260px;
+            --header-height: 64px;
         }
 
         * {
@@ -48,7 +49,18 @@
             flex-direction: column;
             padding: 24px 16px;
             flex-shrink: 0;
-            z-index: 50;
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+
+        /* Sidebar Overlay for Mobile */
+        #sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 90;
+            backdrop-filter: blur(2px);
         }
 
         .logo {
@@ -107,10 +119,11 @@
             flex-direction: column;
             overflow: hidden;
             position: relative;
+            width: 100%;
         }
 
         header {
-            height: 64px;
+            height: var(--header-height);
             background-color: var(--surface-color);
             border-bottom: 1px solid var(--border-color);
             display: flex;
@@ -118,13 +131,29 @@
             justify-content: space-between;
             padding: 0 24px;
             flex-shrink: 0;
+            gap: 16px;
         }
 
         .header-left {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             flex-grow: 1;
+        }
+
+        #menu-toggle {
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        #menu-toggle:hover {
+            background-color: #f1f5f9;
         }
 
         .search-box {
@@ -178,6 +207,7 @@
             background-color: var(--surface-color);
             color: var(--text-main);
             transition: all 0.2s;
+            white-space: nowrap;
         }
 
         .btn-primary {
@@ -227,6 +257,7 @@
             margin-bottom: 24px;
             font-size: 0.875rem;
             color: var(--text-muted);
+            flex-wrap: wrap;
         }
 
         .breadcrumb span {
@@ -334,7 +365,7 @@
             position: fixed;
             inset: 0;
             background-color: rgba(15, 23, 42, 0.9);
-            z-index: 100;
+            z-index: 200;
             backdrop-filter: blur(4px);
         }
 
@@ -342,8 +373,55 @@
             position: absolute;
             inset: 40px;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+        }
+
+        .preview-main {
+            flex-grow: 1;
+            display: flex;
             align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #000;
+        }
+
+        .preview-sidebar {
+            width: 300px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            border-left: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .sidebar-header {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-header h3 {
+            font-size: 1.1rem;
+            word-break: break-all;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .action-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .action-group .btn {
+            width: 100%;
             justify-content: center;
         }
 
@@ -353,32 +431,26 @@
             right: 20px;
             color: white;
             cursor: pointer;
-            background: rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.5);
             padding: 8px;
             border-radius: 50%;
-            transition: background 0.2s;
+            z-index: 210;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .close-modal:hover {
-            background: rgba(255,255,255,0.2);
-        }
-
-        .artplayer-app {
-            width: 100%;
-            height: 100%;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
-        }
-
-        .preview-img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            border-radius: 8px;
+        @media (max-width: 900px) {
+            .modal-content {
+                flex-direction: column;
+                inset: 10px;
+            }
+            .preview-sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40%;
+                overflow-y: auto;
+            }
         }
 
         /* Admin Section */
@@ -389,6 +461,7 @@
             width: 100%;
             max-width: 400px;
             box-shadow: var(--shadow);
+            z-index: 210;
         }
 
         .admin-modal h2 {
@@ -425,7 +498,7 @@
             inset: 0;
             background: rgba(79, 70, 229, 0.1);
             border: 4px dashed var(--primary);
-            z-index: 200;
+            z-index: 300;
             pointer-events: none;
             align-items: center;
             justify-content: center;
@@ -439,10 +512,42 @@
             font-weight: 600;
             color: var(--primary);
         }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            aside {
+                position: fixed;
+                height: 100vh;
+                transform: translateX(-100%);
+            }
+            aside.active {
+                transform: translateX(0);
+            }
+            #sidebar-overlay.active {
+                display: block;
+            }
+            .header-right .btn span {
+                display: none;
+            }
+            .header-right .btn {
+                padding: 8px;
+            }
+            .view-toggle {
+                display: none;
+            }
+            #content {
+                padding: 16px;
+            }
+            .grid-view {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 12px;
+            }
+        }
     </style>
 </head>
 <body ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
-    <aside>
+    <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside id="sidebar">
         <div class="logo" onclick="location.reload()" style="cursor:pointer">
             <i data-lucide="hard-drive"></i>
             <span>LiteDrive</span>
@@ -474,6 +579,10 @@
                 <i data-lucide="shield-check"></i>
                 <span>Admin Login</span>
             </a>
+            <a onclick="logoutAdmin()" class="nav-item" id="nav-logout" style="display: none; color: #f87171;">
+                <i data-lucide="log-out"></i>
+                <span>Admin Logout</span>
+            </a>
             <div id="admin-info" style="display: none; padding: 12px; font-size: 0.8rem; color: #94a3b8;">
                 <i data-lucide="user" style="width: 14px; margin-right: 4px;"></i> Admin Mode Active
             </div>
@@ -483,9 +592,12 @@
     <main>
         <header>
             <div class="header-left">
+                <div id="menu-toggle" onclick="toggleSidebar()">
+                    <i data-lucide="menu"></i>
+                </div>
                 <div class="search-box">
                     <i data-lucide="search" class="icon"></i>
-                    <input type="text" placeholder="Search files..." oninput="handleSearch(this.value)">
+                    <input type="text" placeholder="Search files..." oninput="handleSearch(this.value)" autocomplete="off" spellcheck="false">
                 </div>
             </div>
             <div class="header-right">
@@ -497,6 +609,10 @@
                         <i data-lucide="layout-grid"></i>
                     </div>
                 </div>
+                <button class="btn" id="mkdirBtn" onclick="createFolder()" style="display: none;">
+                    <i data-lucide="folder-plus"></i>
+                    <span>New Folder</span>
+                </button>
                 <button class="btn btn-primary" id="uploadBtn" onclick="triggerUpload()" style="display: none;">
                     <i data-lucide="upload-cloud"></i>
                     <span>Upload</span>
@@ -522,7 +638,12 @@
     <!-- Modals -->
     <div id="previewModal" class="modal">
         <div class="modal-content">
-            <div id="preview-container" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>
+            <div class="preview-main">
+                <div id="preview-container" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>
+            </div>
+            <div class="preview-sidebar" id="previewSidebar">
+                <!-- Sidebar content dynamic -->
+            </div>
         </div>
         <div class="close-modal" onclick="closePreview()">
             <i data-lucide="x"></i>
@@ -554,40 +675,97 @@
         let currentPath = '';
         let adminPassword = '';
         let art = null;
-        let viewMode = 'grid'; // default
+        let viewMode = 'grid';
         let currentCategory = 'all';
-        let allItems = []; // cache for filtering
+        let allItems = [];
         let searchQuery = '';
 
         // Initialize Icons
         lucide.createIcons();
+
+        // Check for saved session on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedPass = localStorage.getItem('adminPassword');
+            if (savedPass) {
+                adminPassword = savedPass;
+                validateAndSetAdminUI();
+            }
+        });
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
 
         async function loginAdmin() {
             const pass = document.getElementById('adminPassword').value;
             if (!pass) return;
             adminPassword = pass;
             
-            // Validate password with a simple test call
+            if (await validateAndSetAdminUI()) {
+                localStorage.setItem('adminPassword', adminPassword);
+                hideAdminModal();
+            } else {
+                alert('Invalid password');
+                adminPassword = '';
+            }
+        }
+
+        async function validateAndSetAdminUI() {
             try {
                 const res = await fetch('/api/upload', {
                     method: 'POST',
                     headers: { 'x-admin-password': adminPassword },
                     body: new FormData() 
                 });
-                // 401 means wrong password, 400 means no file (correct password)
-                if (res.status === 401) {
-                    alert('Invalid password');
-                    adminPassword = '';
-                    return;
+                if (res.status !== 401) {
+                    document.getElementById('uploadBtn').style.display = 'flex';
+                    document.getElementById('mkdirBtn').style.display = 'flex';
+                    document.getElementById('admin-info').style.display = 'block';
+                    document.getElementById('nav-admin').style.display = 'none';
+                    document.getElementById('nav-logout').style.display = 'flex';
+                    lucide.createIcons();
+                    return true;
                 }
-                
-                document.getElementById('uploadBtn').style.display = 'flex';
-                document.getElementById('admin-info').style.display = 'block';
-                document.getElementById('nav-admin').style.display = 'none';
-                hideAdminModal();
-                lucide.createIcons();
+                return false;
             } catch (e) {
                 console.error(e);
+                return false;
+            }
+        }
+
+        function logoutAdmin() {
+            adminPassword = '';
+            localStorage.removeItem('adminPassword');
+            document.getElementById('uploadBtn').style.display = 'none';
+            document.getElementById('mkdirBtn').style.display = 'none';
+            document.getElementById('admin-info').style.display = 'none';
+            document.getElementById('nav-admin').style.display = 'flex';
+            document.getElementById('nav-logout').style.display = 'none';
+            alert('Logged out successfully');
+            lucide.createIcons();
+        }
+
+        async function createFolder() {
+            const folderName = prompt('Enter folder name:');
+            if (!folderName) return;
+
+            try {
+                const response = await fetch('/api/mkdir', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPassword 
+                    },
+                    body: JSON.stringify({ path: currentPath, name: folderName })
+                });
+                const data = await response.json();
+                if (data.error) alert(data.error);
+                else fetchFiles(currentPath);
+            } catch (err) {
+                console.error('Failed to create folder', err);
             }
         }
 
@@ -598,7 +776,7 @@
             viewMode = mode;
             document.getElementById('btn-list').classList.toggle('active', mode === 'list');
             document.getElementById('btn-grid').classList.toggle('active', mode === 'grid');
-            renderFiles(allItems);
+            applyFilters();
         }
 
         function setCategory(cat) {
@@ -615,32 +793,31 @@
 
         function applyFilters() {
             let filtered = allItems;
-            
-            // Category filter
             if (currentCategory === 'photos') {
-                filtered = allItems.filter(i => ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(i.ext));
+                filtered = allItems.filter(i => i.isDirectory || ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(i.ext));
             } else if (currentCategory === 'videos') {
-                filtered = allItems.filter(i => ['.mp4', '.mkv', '.webm', '.mov'].includes(i.ext));
+                filtered = allItems.filter(i => i.isDirectory || ['.mp4', '.mkv', '.webm', '.mov'].includes(i.ext));
             } else if (currentCategory === 'docs') {
-                filtered = allItems.filter(i => ['.pdf', '.txt', '.doc', '.docx'].includes(i.ext));
+                filtered = allItems.filter(i => i.isDirectory || ['.pdf', '.txt', '.doc', '.docx'].includes(i.ext));
             }
-
-            // Search filter
             if (searchQuery) {
                 filtered = filtered.filter(i => i.name.toLowerCase().includes(searchQuery));
             }
-
             renderFiles(filtered);
         }
 
         async function fetchFiles(path = '') {
+            searchQuery = '';
+            currentCategory = 'all';
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-all').classList.add('active');
+            const searchInput = document.querySelector('.search-box input');
+            if (searchInput) searchInput.value = '';
+
             try {
                 const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
                 const data = await response.json();
-                if (data.error) {
-                    console.error(data.error);
-                    return;
-                }
+                if (data.error) return;
                 currentPath = data.currentPath;
                 allItems = data.items;
                 renderBreadcrumb();
@@ -667,54 +844,28 @@
         function renderFiles(items) {
             const container = document.getElementById('file-container');
             container.innerHTML = '';
-
-            if (viewMode === 'list') {
-                renderListView(items, container);
-            } else {
-                renderGridView(items, container);
-            }
+            if (viewMode === 'list') renderListView(items, container);
+            else renderGridView(items, container);
             lucide.createIcons();
         }
 
         function renderListView(items, container) {
             const div = document.createElement('div');
             div.className = 'list-view';
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Size</th>
-                            <th>Modified</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
+            let html = `<table><thead><tr><th>Name</th><th>Size</th><th>Modified</th></tr></thead><tbody>`;
             if (currentPath !== '') {
                 const parentPath = currentPath.split('/').slice(0, -1).join('/');
-                html += `
-                    <tr onclick="fetchFiles('${parentPath}')" style="cursor:pointer">
-                        <td colspan="3"><i data-lucide="corner-left-up" style="width:18px;margin-right:8px;"></i> .. (Parent)</td>
-                    </tr>
-                `;
+                html += `<tr onclick="fetchFiles('${parentPath}')" style="cursor:pointer"><td colspan="3"><i data-lucide="corner-left-up" style="width:18px;margin-right:8px;"></i> .. (Parent)</td></tr>`;
             }
-
             items.forEach(item => {
                 const icon = getItemIcon(item);
                 const size = item.isDirectory ? '-' : formatSize(item.size);
                 const date = new Date(item.mtime).toLocaleDateString();
                 const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
-
-                html += `
-                    <tr onclick="handleItemClick('${itemFullPath}', ${item.isDirectory}, '${item.ext}')" style="cursor:pointer">
-                        <td><i data-lucide="${icon}" style="width:18px;margin-right:12px;color:var(--primary)"></i> ${item.name}</td>
-                        <td>${size}</td>
-                        <td>${date}</td>
-                    </tr>
-                `;
+                html += `<tr onclick="handleItemClick('${itemFullPath}', ${item.isDirectory}, '${item.ext}')" style="cursor:pointer">
+                    <td><i data-lucide="${icon}" style="width:18px;margin-right:12px;color:var(--primary)"></i> ${item.name}</td>
+                    <td>${size}</td><td>${date}</td></tr>`;
             });
-
             html += `</tbody></table>`;
             div.innerHTML = html;
             container.appendChild(div);
@@ -723,35 +874,24 @@
         function renderGridView(items, container) {
             const div = document.createElement('div');
             div.className = 'grid-view';
-
             if (currentPath !== '') {
                 const parentPath = currentPath.split('/').slice(0, -1).join('/');
                 const parentCard = document.createElement('div');
                 parentCard.className = 'grid-item';
                 parentCard.onclick = () => fetchFiles(parentPath);
-                parentCard.innerHTML = `
-                    <div class="file-icon"><i data-lucide="corner-left-up"></i></div>
-                    <div class="file-name">.. (Parent)</div>
-                `;
+                parentCard.innerHTML = `<div class="file-icon"><i data-lucide="corner-left-up"></i></div><div class="file-name">.. (Parent)</div>`;
                 div.appendChild(parentCard);
             }
-
             items.forEach(item => {
                 const icon = getItemIcon(item);
                 const size = item.isDirectory ? 'Folder' : formatSize(item.size);
                 const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
-
                 const card = document.createElement('div');
                 card.className = 'grid-item';
                 card.onclick = () => handleItemClick(itemFullPath, item.isDirectory, item.ext);
-                card.innerHTML = `
-                    <div class="file-icon"><i data-lucide="${icon}"></i></div>
-                    <div class="file-name" title="${item.name}">${item.name}</div>
-                    <div class="file-info">${size}</div>
-                `;
+                card.innerHTML = `<div class="file-icon"><i data-lucide="${icon}"></i></div><div class="file-name" title="${item.name}">${item.name}</div><div class="file-info">${size}</div>`;
                 div.appendChild(card);
             });
-
             container.appendChild(div);
         }
 
@@ -765,15 +905,11 @@
         }
 
         function handleItemClick(path, isDir, ext) {
-            if (isDir) {
-                fetchFiles(path);
-            } else {
+            if (isDir) fetchFiles(path);
+            else {
                 const isPreviewable = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mkv', '.webm', '.pdf', '.txt', '.vtt', '.srt'].includes(ext);
-                if (isPreviewable) {
-                    openPreview(path, ext);
-                } else {
-                    downloadFile(path);
-                }
+                if (isPreviewable) openPreview(path, ext);
+                else downloadFile(path);
             }
         }
 
@@ -785,12 +921,8 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
-        function downloadFile(path) {
-            window.location.href = `/api/download?path=${encodeURIComponent(path)}`;
-        }
-
+        function downloadFile(path) { window.location.href = `/api/download?path=${encodeURIComponent(path)}`; }
         function triggerUpload() { document.getElementById('fileInput').click(); }
-
         async function handleFileSelect(event) {
             const file = event.target.files[0];
             if (file) uploadFile(file);
@@ -800,7 +932,6 @@
             const formData = new FormData();
             formData.append('file', file);
             formData.append('path', currentPath);
-
             try {
                 const response = await fetch('/api/upload', {
                     method: 'POST',
@@ -810,12 +941,9 @@
                 const data = await response.json();
                 if (data.error) alert(data.error);
                 else fetchFiles(currentPath);
-            } catch (err) {
-                console.error('Upload failed', err);
-            }
+            } catch (err) { console.error('Upload failed', err); }
         }
 
-        // Drag & Drop
         function handleDragOver(e) { e.preventDefault(); if (adminPassword) document.getElementById('uploadOverlay').style.display = 'flex'; }
         function handleDragLeave(e) { document.getElementById('uploadOverlay').style.display = 'none'; }
         function handleDrop(e) {
@@ -829,92 +957,115 @@
         async function openPreview(path, ext) {
             const modal = document.getElementById('previewModal');
             const container = document.getElementById('preview-container');
+            const sidebar = document.getElementById('previewSidebar');
             container.innerHTML = '';
             
-            const viewUrl = `/api/view?path=${encodeURIComponent(path)}`;
+            // Render Sidebar
+            const fileName = path.split('/').pop();
+            let sidebarHtml = `
+                <div class="sidebar-header">
+                    <h3>${fileName}</h3>
+                    <p>${ext.toUpperCase()} File</p>
+                </div>
+                <div class="action-group">
+                    <button class="btn" onclick="downloadFile('${path}')">
+                        <i data-lucide="download"></i>
+                        <span>Download</span>
+                    </button>
+            `;
 
+            if (adminPassword) {
+                sidebarHtml += `
+                    <div style="margin: 20px 0; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                        <p style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">Admin Tools</p>
+                        <div class="action-group">
+                            <button class="btn" onclick="renameItem('${path}')">
+                                <i data-lucide="edit-3"></i>
+                                <span>Rename</span>
+                            </button>
+                            <button class="btn" onclick="deleteItem('${path}')" style="color: #ef4444; border-color: #fecaca;">
+                                <i data-lucide="trash-2"></i>
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            sidebarHtml += `</div>`;
+            sidebar.innerHTML = sidebarHtml;
+
+            const viewUrl = `/api/view?path=${encodeURIComponent(path)}`;
             if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
                 container.innerHTML = `<img src="${viewUrl}" class="preview-img" alt="Preview">`;
             } else if (['.mp4', '.mkv', '.webm', '.mov'].includes(ext)) {
                 container.innerHTML = `<div class="artplayer-app"></div>`;
-                
                 try {
                     const infoRes = await fetch(`/api/media-info?path=${encodeURIComponent(path)}`);
                     const info = await infoRes.json();
-                    
-                    const subtitleTracks = info.streams
-                        .filter(s => s.type === 'subtitle')
-                        .map(s => ({
-                            html: s.title || `Subtitle ${s.index} (${s.language})`,
-                            url: `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`,
-                            name: s.title || `Subtitle ${s.index}`
-                        }));
-
+                    const subtitleTracks = info.streams.filter(s => s.type === 'subtitle').map(s => ({
+                        html: s.title || `Subtitle ${s.index}`,
+                        url: `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`,
+                        name: s.title || `Subtitle ${s.index}`
+                    }));
                     art = new Artplayer({
-                        container: '.artplayer-app',
-                        url: viewUrl,
-                        type: ext === '.mkv' ? 'mkv' : (ext === '.mp4' ? 'mp4' : 'webm'),
-                        title: path.split('/').pop(),
-                        autoplay: true,
-                        pip: true,
-                        screenshot: true,
-                        setting: true,
-                        loop: true,
-                        fullscreen: true,
-                        fullscreenWeb: true,
-                        subtitleOffset: true,
-                        miniProgressBar: true,
-                        mutex: true,
-                        backdrop: true,
-                        playsInline: true,
-                        autoPlayback: true,
-                        airplay: true,
-                        theme: '#4f46e5',
-                        subtitle: subtitleTracks.length > 0 ? {
-                            url: subtitleTracks[0].url,
-                            type: 'srt',
-                            style: {
-                                color: '#fff',
-                                fontSize: '24px',
-                                textShadow: '0 0 8px rgba(0,0,0,0.8)',
-                                backgroundColor: 'rgba(0,0,0,0.4)',
-                                padding: '2px 10px',
-                                borderRadius: '4px'
+                        container: '.artplayer-app', url: viewUrl, type: ext === '.mkv' ? 'mkv' : (ext === '.mp4' ? 'mp4' : 'webm'),
+                        title: path.split('/').pop(), autoplay: true, pip: true, screenshot: true, setting: true, loop: true, fullscreen: true, fullscreenWeb: true,
+                        subtitleOffset: true, miniProgressBar: true, mutex: true, backdrop: true, playsInline: true, autoPlayback: true, airplay: true, theme: '#4f46e5',
+                        subtitle: subtitleTracks.length > 0 ? { url: subtitleTracks[0].url, type: 'srt', encoding: 'utf-8' } : {},
+                        settings: [{
+                            width: 200, html: 'Subtitles', tooltip: subtitleTracks.length > 0 ? subtitleTracks[0].name : 'None',
+                            selector: [{ html: 'Off', url: '' }, ...subtitleTracks],
+                            onSelect: function (item) {
+                                if (item.url) art.subtitle.switch(item.url, { name: item.name, type: 'srt' });
+                                else art.subtitle.show = false;
+                                return item.html;
                             },
-                            encoding: 'utf-8',
-                        } : {},
-                        settings: [
-                            {
-                                width: 200,
-                                html: 'Subtitles',
-                                tooltip: subtitleTracks.length > 0 ? subtitleTracks[0].name : 'None',
-                                selector: [
-                                    { html: 'Off', url: '' },
-                                    ...subtitleTracks
-                                ],
-                                onSelect: function (item) {
-                                    if (item.url) {
-                                        art.subtitle.switch(item.url, {
-                                            name: item.name,
-                                            type: 'srt',
-                                        });
-                                    } else {
-                                        art.subtitle.show = false;
-                                    }
-                                    return item.html;
-                                },
-                            },
-                        ],
+                        }],
                     });
-                } catch (err) {
-                    container.innerHTML = `<video src="${viewUrl}" controls autoplay style="max-width:100%; border-radius:12px;"></video>`;
-                }
+                } catch (err) { container.innerHTML = `<video src="${viewUrl}" controls autoplay style="max-width:100%; border-radius:12px;"></video>`; }
             } else if (ext === '.pdf' || ext === '.txt') {
                 container.innerHTML = `<iframe src="${viewUrl}" style="width:100%; height:100%; border:none; background:white; border-radius:12px;"></iframe>`;
             }
-
             modal.style.display = 'block';
             lucide.createIcons();
+        }
+
+        async function renameItem(path) {
+            const oldName = path.split('/').pop();
+            const newName = prompt('Enter new name:', oldName);
+            if (!newName || newName === oldName) return;
+
+            try {
+                const res = await fetch('/api/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                    body: JSON.stringify({ path, newName })
+                });
+                const data = await res.json();
+                if (data.error) alert(data.error);
+                else {
+                    closePreview();
+                    fetchFiles(currentPath);
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function deleteItem(path) {
+            if (!confirm('Are you sure you want to delete this item?')) return;
+
+            try {
+                const res = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                    body: JSON.stringify({ path })
+                });
+                const data = await res.json();
+                if (data.error) alert(data.error);
+                else {
+                    closePreview();
+                    fetchFiles(currentPath);
+                }
+            } catch (err) { console.error(err); }
         }
 
         function closePreview() {
@@ -923,20 +1074,14 @@
             modal.style.display = 'none';
         }
 
-        // Initial load
         fetchFiles();
-        
-        // Status check
-        fetch('/api/status')
-            .then(r => r.json())
-            .then(d => {
-                document.getElementById('status-text').innerText = 'Online';
-                document.getElementById('status-dot').style.background = '#10b981';
-            })
-            .catch(e => {
-                document.getElementById('status-text').innerText = 'Offline';
-                document.getElementById('status-dot').style.background = '#ef4444';
-            });
+        fetch('/api/status').then(r => r.json()).then(d => {
+            document.getElementById('status-text').innerText = 'Online';
+            document.getElementById('status-dot').style.background = '#10b981';
+        }).catch(e => {
+            document.getElementById('status-text').innerText = 'Offline';
+            document.getElementById('status-dot').style.background = '#ef4444';
+        });
     </script>
 </body>
 </html>

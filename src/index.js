@@ -135,10 +135,73 @@ app.get('/api/files', (req, res) => {
     }
 });
 
+// API: Create directory (Admin only)
+app.post('/api/mkdir', authMiddleware, (req, res) => {
+    try {
+        const { path: parentPath, name } = req.body;
+        if (!name) return res.status(400).json({ error: 'Folder name is required' });
+
+        const targetDir = path.join(resolvePath(parentPath || ''), name);
+        
+        if (fs.existsSync(targetDir)) {
+            return res.status(400).json({ error: 'Folder already exists' });
+        }
+
+        fs.mkdirSync(targetDir);
+        res.json({ message: 'Folder created successfully' });
+    } catch (err) {
+        res.status(403).json({ error: err.message });
+    }
+});
+
 // API: Upload file (Admin only)
 app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     res.json({ message: 'File uploaded successfully', file: req.file });
+});
+
+// API: Rename file/folder (Admin only)
+app.post('/api/rename', authMiddleware, (req, res) => {
+    try {
+        const { path: itemPath, newName } = req.body;
+        if (!itemPath || !newName) return res.status(400).json({ error: 'Path and new name are required' });
+
+        const oldPath = resolvePath(itemPath);
+        const parentDir = path.dirname(oldPath);
+        const newPath = path.join(parentDir, newName);
+
+        if (fs.existsSync(newPath)) {
+            return res.status(400).json({ error: 'Target name already exists' });
+        }
+
+        fs.renameSync(oldPath, newPath);
+        res.json({ message: 'Renamed successfully' });
+    } catch (err) {
+        res.status(403).json({ error: err.message });
+    }
+});
+
+// API: Delete file/folder (Admin only)
+app.post('/api/delete', authMiddleware, (req, res) => {
+    try {
+        const { path: itemPath } = req.body;
+        if (!itemPath) return res.status(400).json({ error: 'Path is required' });
+
+        const targetPath = resolvePath(itemPath);
+        if (!fs.existsSync(targetPath)) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+
+        const stats = fs.statSync(targetPath);
+        if (stats.isDirectory()) {
+            fs.rmSync(targetPath, { recursive: true, force: true });
+        } else {
+            fs.unlinkSync(targetPath);
+        }
+        res.json({ message: 'Deleted successfully' });
+    } catch (err) {
+        res.status(403).json({ error: err.message });
+    }
 });
 
 // API: Download file
