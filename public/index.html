@@ -28,6 +28,38 @@
             align-items: center;
             margin-bottom: 20px;
         }
+        .admin-controls {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .admin-controls input[type="password"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .admin-controls button {
+            padding: 8px 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .admin-controls button:hover {
+            background-color: #2980b9;
+        }
+        .upload-section {
+            display: none;
+            margin-top: 10px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
         .breadcrumb {
             margin-bottom: 15px;
             font-size: 0.9em;
@@ -131,6 +163,15 @@
             <div id="status">Connecting...</div>
         </header>
 
+        <div class="admin-controls">
+            <input type="password" id="adminPassword" placeholder="Admin Password">
+            <button onclick="loginAdmin()">Login</button>
+            <div id="uploadSection" class="upload-section">
+                <input type="file" id="fileInput">
+                <button onclick="uploadFile()">Upload</button>
+            </div>
+        </div>
+
         <div class="breadcrumb" id="breadcrumb">
             Root
         </div>
@@ -161,6 +202,45 @@
 
     <script>
         let currentPath = '';
+        let adminPassword = '';
+
+        function loginAdmin() {
+            const pass = document.getElementById('adminPassword').value;
+            if (!pass) return alert('Enter password');
+            adminPassword = pass;
+            document.getElementById('uploadSection').style.display = 'block';
+            alert('Admin mode enabled (Password stored in memory)');
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length === 0) return alert('Select a file');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('path', currentPath);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {
+                        'x-admin-password': adminPassword
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert('Upload successful');
+                    fetchFiles(currentPath);
+                }
+            } catch (err) {
+                console.error('Upload failed', err);
+                alert('Upload failed');
+            }
+        }
 
         async function fetchFiles(path = '') {
             try {

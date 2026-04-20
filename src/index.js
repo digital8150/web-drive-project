@@ -2,18 +2,42 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_PATH = process.env.DATA_PATH || path.join(__dirname, '../uploads');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // Ensure uploads directory exists
 if (!fs.existsSync(DATA_PATH)) {
     fs.mkdirSync(DATA_PATH, { recursive: true });
 }
 
+// Multer storage configuration
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = resolvePath(req.body.path || '');
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+const upload = multer({ storage });
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Middleware: Admin Authentication
+const authMiddleware = (req, res, next) => {
+    const password = req.headers['x-admin-password'];
+    if (password === ADMIN_PASSWORD) {
+        next();
+    } else {
+        res.status(401).json({ error: 'Unauthorized: Admin access required' });
+    }
+};
 
 // Helper to resolve and validate paths
 const resolvePath = (requestedPath = '') => {
@@ -58,6 +82,12 @@ app.get('/api/files', (req, res) => {
     } catch (err) {
         res.status(403).json({ error: err.message });
     }
+});
+
+// API: Upload file (Admin only)
+app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    res.json({ message: 'File uploaded successfully', file: req.file });
 });
 
 // API: Download file
