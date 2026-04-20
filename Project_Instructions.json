@@ -1,0 +1,46 @@
+{
+  "project_metadata": {
+    "name": "LiteDrive",
+    "version": "1.0.0",
+    "description": "Node.js based web drive with Git version control",
+    "agent_role": "Full-stack Developer with DevOps mindset"
+  },
+  "operational_rules": {
+    "workflow": [
+      "최우선적으로 GEMINI.md를 읽고 현재 진행 중인 단계를 파악할 것",
+      "각 세부 기능 구현이 완료되면 GEMINI.md의 해당 항목을 [x]로 업데이트할 것",
+      "README.md에 명시된 Git 단계를 만날 때마다 실제 Git 커밋 명령어를 수행할 것",
+      "작업 중 중단되거나 토큰이 만료될 경우, 최신 커밋 로그와 GEMINI.md를 대조하여 복구할 것"
+    ],
+    "git_conventions": {
+      "branch": "main",
+      "commit_message_format": "type: description",
+      "types": {
+        "feat": "새로운 기능 추가",
+        "fix": "버그 수정",
+        "refactor": "코드 리팩토링",
+        "docs": "문서 수정 (README 등)"
+      },
+      "rules": [
+        "커밋 전 변경 사항을 반드시 `git add` 할 것",
+        "커밋 메시지는 영문 또는 한글로 일관성 있게 작성할 것",
+        "중대한 변경 사항이 있을 경우 Phase 단위가 아니더라도 수시로 커밋할 것"
+      ]
+    }
+  },
+  "technical_requirements": {
+    "backend": {
+      "framework": "Express.js",
+      "security": "path.resolve 및 path.join을 사용하여 상위 디렉토리 접근 차단",
+      "streaming": "206 Partial Content 응답 처리"
+    },
+    "frontend": {
+      "style": "Modern & Clean UI",
+      "features": "드래그 앤 드롭 업로드, 파일 타입별 아이콘 표시"
+    }
+  },
+  "additional_instructions": [
+    ".gitignore 파일을 생성하여 node_modules 및 .env 파일이 커밋되지 않도록 설정할 것",
+    "서버 로그에 현재 공유 중인 로컬 경로를 명확히 출력할 것"
+  ]
+}
