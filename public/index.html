@@ -763,6 +763,9 @@
                 <span id="selected-count">0</span> items selected
             </div>
             <div class="selection-actions">
+                <button id="preview-btn" class="btn btn-primary" onclick="previewSelectedItem()">
+                    <i data-lucide="eye"></i> Preview
+                </button>
                 <button class="btn" onclick="downloadSelectedItem()">
                     <i data-lucide="download"></i> Download
                 </button>
@@ -865,6 +868,10 @@
             selectedItem = { path, isDir, ext };
             e.currentTarget.classList.add('selected');
             document.getElementById('selected-count').innerText = '1';
+            
+            const isPreviewable = !isDir && ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mkv', '.webm', '.pdf', '.txt', '.vtt', '.srt'].includes(ext);
+            document.getElementById('preview-btn').style.display = isPreviewable ? 'flex' : 'none';
+            
             document.getElementById('selection-toolbar').style.display = 'flex';
         }
 
@@ -1175,17 +1182,23 @@
         async function uploadFile(file) {
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('path', currentPath);
             try {
-                const response = await fetch('/api/upload', {
+                const response = await fetch(`/api/upload?path=${encodeURIComponent(currentPath)}`, {
                     method: 'POST',
                     headers: { 'x-admin-password': adminPassword },
                     body: formData
                 });
                 const data = await response.json();
-                if (data.error) alert(data.error);
+                if (data.error) await showDialog({ title: 'Error', message: data.error });
                 else fetchFiles(currentPath);
             } catch (err) { console.error('Upload failed', err); }
+        }
+
+        async function previewSelectedItem() {
+            if (selectedItem) {
+                openPreview(selectedItem.path, selectedItem.ext);
+                clearSelection();
+            }
         }
 
         function handleDragOver(e) { e.preventDefault(); if (adminPassword) document.getElementById('uploadOverlay').style.display = 'flex'; }

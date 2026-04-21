@@ -18,11 +18,12 @@ if (!fs.existsSync(DATA_PATH)) {
 // Multer storage configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = resolvePath(req.body.path || '');
+        const uploadDir = resolvePath(req.uploadPath || '');
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
+        const safeName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        cb(null, Date.now() + '-' + safeName);
     }
 });
 const upload = multer({ 
@@ -155,7 +156,11 @@ app.post('/api/mkdir', authMiddleware, (req, res) => {
 });
 
 // API: Upload file (Admin only)
-app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
+app.post('/api/upload', authMiddleware, (req, res, next) => {
+    // 쿼리로 경로를 확실히 전달받아 multer 인스턴스에 주입
+    req.uploadPath = req.query.path || '';
+    next();
+}, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     res.json({ message: 'File uploaded successfully', file: req.file });
 });
