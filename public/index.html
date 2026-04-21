@@ -23,6 +23,7 @@
             --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             --sidebar-width: 260px;
             --header-height: 64px;
+            --grid-size: 180px;
         }
 
         * {
@@ -50,7 +51,11 @@
             padding: 24px 16px;
             flex-shrink: 0;
             z-index: 100;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, margin-left 0.3s ease;
+        }
+
+        body.sidebar-collapsed aside {
+            margin-left: calc(-1 * var(--sidebar-width));
         }
 
         /* Sidebar Overlay for Mobile */
@@ -194,6 +199,24 @@
             gap: 12px;
         }
 
+        .zoom-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            border-right: 1px solid var(--border-color);
+            margin-right: 4px;
+        }
+
+        .zoom-slider-container i {
+            color: var(--text-muted);
+        }
+
+        input[type="range"] {
+            width: 80px;
+            cursor: pointer;
+        }
+
         .btn {
             display: flex;
             align-items: center;
@@ -309,7 +332,7 @@
         /* Grid View */
         .grid-view {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(var(--grid-size), 1fr));
             gap: 20px;
         }
 
@@ -334,14 +357,26 @@
         }
 
         .grid-item .file-icon {
-            width: 64px;
-            height: 64px;
+            width: 100%;
+            aspect-ratio: 1;
             display: flex;
             align-items: center;
             justify-content: center;
             background-color: #f1f5f9;
             border-radius: 8px;
             color: var(--primary);
+            overflow: hidden;
+        }
+
+        .grid-item .file-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .grid-item .file-icon i {
+            width: 48px;
+            height: 48px;
         }
 
         .grid-item .file-name {
@@ -513,12 +548,76 @@
             color: var(--primary);
         }
 
+        /* Custom Dialog Modals */
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dialog-box {
+            background: #fff;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 24px;
+            animation: slideUp 0.2s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .dialog-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .dialog-message {
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .dialog-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9375rem;
+            outline: none;
+        }
+
+        .dialog-input:focus {
+            border-color: var(--primary);
+        }
+
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             aside {
                 position: fixed;
                 height: 100vh;
                 transform: translateX(-100%);
+            }
+            body.sidebar-collapsed aside {
+                margin-left: 0;
             }
             aside.active {
                 transform: translateX(0);
@@ -533,6 +632,9 @@
                 padding: 8px;
             }
             .view-toggle {
+                display: none;
+            }
+            .zoom-slider-container {
                 display: none;
             }
             #content {
@@ -601,6 +703,11 @@
                 </div>
             </div>
             <div class="header-right">
+                <div class="zoom-slider-container" id="zoom-container">
+                    <i data-lucide="minus" style="width: 14px;"></i>
+                    <input type="range" id="zoom-slider" min="120" max="300" value="180" oninput="updateGridSize(this.value)">
+                    <i data-lucide="plus" style="width: 14px;"></i>
+                </div>
                 <div class="view-toggle">
                     <div class="toggle-btn" id="btn-list" onclick="setViewMode('list')" title="List View">
                         <i data-lucide="list"></i>
@@ -668,6 +775,18 @@
         <div class="upload-msg">Drop files to upload</div>
     </div>
 
+    <div id="dialogOverlay" class="dialog-overlay">
+        <div class="dialog-box">
+            <div id="dialogTitle" class="dialog-title">Title</div>
+            <div id="dialogMessage" class="dialog-message">Message</div>
+            <input type="text" id="dialogInput" class="dialog-input" style="display: none;">
+            <div class="dialog-footer">
+                <button id="dialogCancel" class="btn">Cancel</button>
+                <button id="dialogConfirm" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(event)">
 
     <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
@@ -683,20 +802,58 @@
         // Initialize Icons
         lucide.createIcons();
 
-        // Check for saved session on load
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedPass = localStorage.getItem('adminPassword');
-            if (savedPass) {
-                adminPassword = savedPass;
-                validateAndSetAdminUI();
-            }
-        });
+        // Custom Dialog Utility
+        function showDialog({ type = 'alert', title = '', message = '', placeholder = '', value = '' }) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('dialogOverlay');
+                const titleEl = document.getElementById('dialogTitle');
+                const messageEl = document.getElementById('dialogMessage');
+                const inputEl = document.getElementById('dialogInput');
+                const cancelBtn = document.getElementById('dialogCancel');
+                const confirmBtn = document.getElementById('dialogConfirm');
+
+                titleEl.innerText = title;
+                messageEl.innerText = message;
+                inputEl.value = value;
+                inputEl.placeholder = placeholder;
+                inputEl.style.display = type === 'prompt' ? 'block' : 'none';
+                cancelBtn.style.display = type === 'alert' ? 'none' : 'block';
+                overlay.style.display = 'flex';
+
+                if (type === 'prompt') setTimeout(() => inputEl.focus(), 50);
+
+                const cleanup = (val) => {
+                    overlay.style.display = 'none';
+                    confirmBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    inputEl.onkeydown = null;
+                    resolve(val);
+                };
+
+                confirmBtn.onclick = () => cleanup(type === 'prompt' ? inputEl.value : true);
+                cancelBtn.onclick = () => cleanup(null);
+                inputEl.onkeydown = (e) => {
+                    if (e.key === 'Enter') confirmBtn.click();
+                    if (e.key === 'Escape') cancelBtn.click();
+                };
+            });
+        }
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
+            const isMobile = window.innerWidth <= 768;
+
+            if (isMobile) {
+                sidebar.classList.toggle('active');
+                overlay.classList.toggle('active');
+            } else {
+                document.body.classList.toggle('sidebar-collapsed');
+            }
+        }
+
+        function updateGridSize(val) {
+            document.documentElement.style.setProperty('--grid-size', val + 'px');
         }
 
         async function loginAdmin() {
@@ -749,7 +906,7 @@
         }
 
         async function createFolder() {
-            const folderName = prompt('Enter folder name:');
+            const folderName = await showDialog({ type: 'prompt', title: 'New Folder', message: 'Enter folder name:', placeholder: 'Folder name' });
             if (!folderName) return;
 
             try {
@@ -762,7 +919,7 @@
                     body: JSON.stringify({ path: currentPath, name: folderName })
                 });
                 const data = await response.json();
-                if (data.error) alert(data.error);
+                if (data.error) await showDialog({ title: 'Error', message: data.error });
                 else fetchFiles(currentPath);
             } catch (err) {
                 console.error('Failed to create folder', err);
@@ -776,6 +933,7 @@
             viewMode = mode;
             document.getElementById('btn-list').classList.toggle('active', mode === 'list');
             document.getElementById('btn-grid').classList.toggle('active', mode === 'grid');
+            document.getElementById('zoom-container').style.display = mode === 'grid' ? 'flex' : 'none';
             applyFilters();
         }
 
@@ -883,13 +1041,21 @@
                 div.appendChild(parentCard);
             }
             items.forEach(item => {
-                const icon = getItemIcon(item);
+                const isImage = !item.isDirectory && ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(item.ext);
                 const size = item.isDirectory ? 'Folder' : formatSize(item.size);
                 const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
                 const card = document.createElement('div');
                 card.className = 'grid-item';
                 card.onclick = () => handleItemClick(itemFullPath, item.isDirectory, item.ext);
-                card.innerHTML = `<div class="file-icon"><i data-lucide="${icon}"></i></div><div class="file-name" title="${item.name}">${item.name}</div><div class="file-info">${size}</div>`;
+                
+                let iconHtml = '';
+                if (isImage) {
+                    iconHtml = `<img src="/api/view?path=${encodeURIComponent(itemFullPath)}" loading="lazy" alt="${item.name}">`;
+                } else {
+                    iconHtml = `<i data-lucide="${getItemIcon(item)}"></i>`;
+                }
+
+                card.innerHTML = `<div class="file-icon">${iconHtml}</div><div class="file-name" title="${item.name}">${item.name}</div><div class="file-info">${size}</div>`;
                 div.appendChild(card);
             });
             container.appendChild(div);
@@ -1032,7 +1198,7 @@
 
         async function renameItem(path) {
             const oldName = path.split('/').pop();
-            const newName = prompt('Enter new name:', oldName);
+            const newName = await showDialog({ type: 'prompt', title: 'Rename', message: 'Enter new name:', value: oldName });
             if (!newName || newName === oldName) return;
 
             try {
@@ -1042,7 +1208,7 @@
                     body: JSON.stringify({ path, newName })
                 });
                 const data = await res.json();
-                if (data.error) alert(data.error);
+                if (data.error) await showDialog({ title: 'Error', message: data.error });
                 else {
                     closePreview();
                     fetchFiles(currentPath);
@@ -1051,7 +1217,8 @@
         }
 
         async function deleteItem(path) {
-            if (!confirm('Are you sure you want to delete this item?')) return;
+            const confirm = await showDialog({ type: 'confirm', title: 'Delete Item', message: 'Are you sure you want to delete this item?' });
+            if (!confirm) return;
 
             try {
                 const res = await fetch('/api/delete', {
@@ -1060,7 +1227,7 @@
                     body: JSON.stringify({ path })
                 });
                 const data = await res.json();
-                if (data.error) alert(data.error);
+                if (data.error) await showDialog({ title: 'Error', message: data.error });
                 else {
                     closePreview();
                     fetchFiles(currentPath);
