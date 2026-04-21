@@ -609,6 +609,33 @@
             gap: 12px;
         }
 
+        /* Selection Toolbar */
+        .selection-toolbar {
+            height: 56px;
+            background: #fff;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: #f8fafc;
+        }
+
+        .selection-info {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .selection-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .grid-item.selected {
+            border-color: var(--primary);
+            background-color: #eef2ff;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             aside {
@@ -644,6 +671,10 @@
                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: 12px;
             }
+        }
+
+        #menu-toggle {
+            display: flex !important;
         }
     </style>
 </head>
@@ -727,7 +758,25 @@
             </div>
         </header>
 
-        <div id="content">
+        <div id="selection-toolbar" class="selection-toolbar" style="display: none;">
+            <div class="selection-info">
+                <span id="selected-count">0</span> items selected
+            </div>
+            <div class="selection-actions">
+                <button class="btn" onclick="downloadSelectedItem()">
+                    <i data-lucide="download"></i> Download
+                </button>
+                <button class="btn" onclick="renameSelectedItem()">
+                    <i data-lucide="edit-3"></i> Rename
+                </button>
+                <button class="btn" onclick="deleteSelectedItem()" style="color: #ef4444;">
+                    <i data-lucide="trash-2"></i> Delete
+                </button>
+                <button class="btn" onclick="clearSelection()">Cancel</button>
+            </div>
+        </div>
+
+        <div id="content" onclick="deselectAll(event)">
             <div class="breadcrumb" id="breadcrumb">
                 <!-- Dynamic -->
             </div>
@@ -797,10 +846,38 @@
         let viewMode = 'grid';
         let currentCategory = 'all';
         let allItems = [];
-        let searchQuery = '';
+        let selectedItem = null;
 
-        // Initialize Icons
-        lucide.createIcons();
+        function deselectAll(e) {
+            if (e.target.closest('.grid-item') || e.target.closest('.list-view table')) return;
+            clearSelection();
+        }
+
+        function clearSelection() {
+            selectedItem = null;
+            document.querySelectorAll('.grid-item, .list-view tr').forEach(el => el.classList.remove('selected'));
+            document.getElementById('selection-toolbar').style.display = 'none';
+        }
+
+        function toggleSelection(e, path, isDir, ext) {
+            e.stopPropagation();
+            clearSelection();
+            selectedItem = { path, isDir, ext };
+            e.currentTarget.classList.add('selected');
+            document.getElementById('selected-count').innerText = '1';
+            document.getElementById('selection-toolbar').style.display = 'flex';
+        }
+
+        async function downloadSelectedItem() {
+            if (selectedItem) {
+                downloadFile(selectedItem.path);
+                clearSelection();
+            }
+        }
+
+        async function deleteSelectedItem() {
+            if (selectedItem) await deleteItem(selectedItem.path);
+        }
 
         // Custom Dialog Utility
         function showDialog({ type = 'alert', title = '', message = '', placeholder = '', value = '' }) {
@@ -1046,7 +1123,8 @@
                 const itemFullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
                 const card = document.createElement('div');
                 card.className = 'grid-item';
-                card.onclick = () => handleItemClick(itemFullPath, item.isDirectory, item.ext);
+                card.onclick = (e) => toggleSelection(e, itemFullPath, item.isDirectory, item.ext);
+                card.ondblclick = () => handleItemClick(itemFullPath, item.isDirectory, item.ext);
                 
                 let iconHtml = '';
                 if (isImage) {
