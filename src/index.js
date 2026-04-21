@@ -226,19 +226,81 @@ app.get('/api/download', (req, res) => {
     }
 });
 
-// API: Stream or Preview file
+// API: Stream or Preview file (오디오 트랙 선택 및 Seek 지원)
 app.get('/api/view', (req, res) => {
     try {
         const filePath = req.query.path;
+        const audioIndex = req.query.audio_index; 
+        const startTime = req.query.start; // 프론트에서 보낸 시작 시간
+        
         if (!filePath) return res.status(400).json({ error: 'Path is required' });
-
         const targetPath = resolvePath(filePath);
-        if (!fs.existsSync(targetPath) || fs.statSync(targetPath).isDirectory()) {
+        
+        if (!fs.existsSync(targetPath)) {
+            console.error(`[View Error] File not found: ${targetPath}`);
             return res.status(404).json({ error: 'File not found' });
         }
 
-        const stat = fs.statSync(targetPath);
-        const fileSize = stat.size;
+        const stats = fs.statSync(targetPath);
+        const ext = path.extname(targetPath).toLowerCase();
+        const isVideo = ['.mp4', '.mkv', '.webm', '.mov'].includes(ext);
+
+        // [오디오 리믹싱 스트리밍 모드] audio_index가 있을 때
+        if (isVideo && audioIndex !== undefined) {
+            console.log(`[Remux Start] Audio: ${audioIndex}, Start Time: ${startTime || 0}`);
+            
+            res.status(200).set({
+                'Content-Type': 'video/mp4',
+                'Transfer-Encoding': 'chunked',
+                'Connection': 'keep-alive',
+                'Cache-Control': 'no-cache'
+            });
+
+            const ffmpegCommand = ffmpeg(targetPath);
+            
+            // 시작 시간이 있으면 해당 시간부터 잘라서 스트리밍
+            if (startTime) {
+                ffmpegCommand.setStartTime(startTime); 
+            }
+
+            const ffmpegProcess = ffmpegCommand
+                .outputOptions([
+                    '-map 0:v:0',              // 비디오 트랙 1번
+                    `-map 0:${audioIndex}`,    // 선택한 오디오 트랙
+                    '-c:v copy',               // 비디오 복사 (인코딩 X)
+                    '-tag:v hvc1',             // HEVC 웹 브라우저 호환성 태그 강제
+                    '-c:a aac',                // 오디오 AAC 변환
+                    '-b:a 192k',               // 오디오 비트레이트
+                    '-ac 2',                   // 스테레오 강제
+                    '-f mp4',                  // 포맷 강제
+                    // faststart 제거됨 (에러 원인)
+                    '-movflags frag_keyframe+empty_moov+default_base_moof+omit_tfhd_offset',
+                    '-preset ultrafast',       // 첫 데이터 생성 속도 극대화
+                    '-tune zerolatency',       // 지연 시간 제거
+                    '-strict -2'
+                ])
+                .on('start', (cmd) => console.log('FFmpeg Cmd:', cmd))
+                .on('error', (err) => {
+                    if (err.message.includes('SIGKILL') || err.message.includes('Output stream closed')) {
+                        return;
+                    }
+                    console.error('FFmpeg Critical Error:', err.message);
+                });
+
+            // 클라이언트에 데이터 전송
+            ffmpegProcess.pipe(res, { end: true });
+
+            // 사용자가 연결 끊으면 프로세스 즉시 종료 (리소스 보호)
+            req.on('close', () => {
+                console.log('[Remux] Connection closed. Killing FFmpeg.');
+                ffmpegProcess.kill('SIGKILL');
+            });
+
+            return; 
+        }
+
+        // [일반 스트리밍 모드] (오디오 선택 없을 때 - Range 지원)
+        const fileSize = stats.size;
         const range = req.headers.range;
 
         if (range) {
@@ -246,25 +308,24 @@ app.get('/api/view', (req, res) => {
             const start = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
             const chunksize = (end - start) + 1;
-            const file = fs.createReadStream(targetPath, { start, end });
-            const head = {
+            
+            res.writeHead(206, {
                 'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                 'Accept-Ranges': 'bytes',
                 'Content-Length': chunksize,
                 'Content-Type': getMimeType(targetPath),
-            };
-            res.writeHead(206, head);
-            file.pipe(res);
+            });
+            fs.createReadStream(targetPath, { start, end }).pipe(res);
         } else {
-            const head = {
+            res.writeHead(200, {
                 'Content-Length': fileSize,
                 'Content-Type': getMimeType(targetPath),
-            };
-            res.writeHead(200, head);
+            });
             fs.createReadStream(targetPath).pipe(res);
         }
     } catch (err) {
-        res.status(403).json({ error: err.message });
+        console.error('[View Catch Error]:', err.message);
+        if (!res.headersSent) res.status(403).json({ error: err.message });
     }
 });
 
