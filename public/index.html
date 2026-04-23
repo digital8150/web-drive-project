@@ -684,6 +684,18 @@
             max-height: 100%;
         }
 
+        /* 1. 자막 강제 가시성 확보 및 하단 위치 고정 */
+        .artplayer-app .art-subtitle {
+            bottom: 50px !important; /* 재생바가 사라져도 위치를 유지하도록 고정 */
+            z-index: 20 !important;  /* 컨트롤바(보통 10~15)보다 높게 설정하거나 명확히 구분 */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9); /* 가독성 강화 */
+        }
+
+        /* 2. 컨트롤 바가 사라질 때 자막 위치 급변 방지 */
+        .artplayer-app.art-hide-control .art-subtitle {
+            bottom: 20px !important; /* 재생바가 숨겨졌을 때 살짝 아래로 내려가되 사라지지 않게 함 */
+        }
+
         /* 이미지 프리뷰도 꽉 차게 조절 */
         .preview-img {
             max-width: 100%;
@@ -1226,137 +1238,173 @@
         }
 
         async function openPreview(path, ext) {
-    const modal = document.getElementById('previewModal');
-    const container = document.getElementById('preview-container');
-    const sidebar = document.getElementById('previewSidebar');
-    
-    // 1. 기존 인스턴스 파괴 (찌꺼기 방지)
-    container.innerHTML = ''; 
-    if (art) {
-        art.destroy();
-        art = null;
-    }
-
-    const fileName = path.split('/').pop();
-    const viewUrl = `/api/view?path=${encodeURIComponent(path)}`;
-
-    // 2. 사이드바 구성
-    let sidebarHtml = `
-        <div class="sidebar-header">
-            <h3>${fileName}</h3>
-            <p>${ext.toUpperCase()} File</p>
-        </div>
-        <div class="action-group">
-            <button class="btn" onclick="downloadFile('${path}')">
-                <i data-lucide="download"></i> <span>Download</span>
-            </button>
-    `;
-
-    if (adminPassword) {
-        sidebarHtml += `
-            <div style="margin: 20px 0; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                <p style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">Admin Tools</p>
-                <div class="action-group">
-                    <button class="btn" onclick="renameItem('${path}')"><i data-lucide="edit-3"></i><span>Rename</span></button>
-                    <button class="btn" onclick="deleteItem('${path}')" style="color: #ef4444; border-color: #fecaca;"><i data-lucide="trash-2"></i><span>Delete</span></button>
-                </div>
-            </div>
-        `;
-    }
-    sidebarHtml += `</div>`;
-    sidebar.innerHTML = sidebarHtml;
-
-    // 3. 파일 타입별 렌더링
-    try {
-        if (['.mp4', '.mkv', '.webm', '.mov'].includes(ext)) {
-            container.innerHTML = `<div class="artplayer-app" style="width:100%; height:100%;"></div>`;
+            const modal = document.getElementById('previewModal');
+            const container = document.getElementById('preview-container');
+            const sidebar = document.getElementById('previewSidebar');
             
-            const infoRes = await fetch(`/api/media-info?path=${encodeURIComponent(path)}`);
-            const info = await infoRes.json();
-            const streams = info.streams || [];
+            // 1. 기존 인스턴스 파괴 (찌꺼기 방지)
+            container.innerHTML = ''; 
+            if (art) {
+                art.destroy();
+                art = null;
+            }
 
-            const subtitleTracks = streams
-                .filter(s => s.type === 'subtitle')
-                .map(s => ({
-                    html: `[자막 ${s.index}] ${s.title || 'Subtitle'} (${s.language || 'und'})`,
-                    url: `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`,
-                    name: `sub_${s.index}`
-                }));
+            const fileName = path.split('/').pop();
+            const viewUrl = `/api/view?path=${encodeURIComponent(path)}`;
 
-            const audioTracks = streams
-                .filter(s => s.type.toLowerCase() === 'audio')
-                .map(s => ({
-                    html: `[오디오 ${s.index}] ${s.title || 'Audio'} (${s.language || 'und'})`,
-                    index: s.index,
-                    name: `aud_${s.index}`
-                }));
+            // 2. 사이드바 구성
+            let sidebarHtml = `
+                <div class="sidebar-header">
+                    <h3>${fileName}</h3>
+                    <p>${ext.toUpperCase()} File</p>
+                </div>
+                <div class="action-group">
+                    <button class="btn" onclick="downloadFile('${path}')">
+                        <i data-lucide="download"></i> <span>Download</span>
+                    </button>
+            `;
 
-            // Artplayer 초기화
-            art = new Artplayer({
-                container: '.artplayer-app',
-                url: viewUrl,
-                type: 'mp4',
-                title: fileName,
-                autoplay: true,
-                setting: true,
-                playbackRate: true,
-                aspectRatio: true,
-                pip: true,
-                fullscreen: true,
-                fullscreenWeb: true,
-                theme: '#4f46e5',
-                subtitle: subtitleTracks.length > 0 ? {
-                    url: subtitleTracks[0].url,
-                    type: 'srt',
-                    encoding: 'utf-8',
-                } : {},
-                settings: [
-                    {
-                        width: 250,
-                        html: '자막 선택(서버)',
-                        tooltip: subtitleTracks.length > 0 ? '선택 가능' : '없음',
-                        selector: [{ html: '자막 끄기', url: '' }, ...subtitleTracks],
-                        onSelect: function (item) {
-                            if (item.url) art.subtitle.switch(item.url, { name: item.name, type: 'srt' });
-                            else art.subtitle.show = false;
-                            return item.html;
-                        },
-                    },
-                    {
-                        width: 250,
-                        html: '오디오 트랙(서버)',
-                        tooltip: audioTracks.length > 0 ? '선택 가능' : '기본',
-                        selector: audioTracks,
-                        onSelect: function (item) {
-                            const currentTime = art.currentTime;
-                            // 서버에 현재 시간을 전달해서 거기서부터 렌더링하도록 요청
-                            const newUrl = `/api/view?path=${encodeURIComponent(path)}&audio_index=${item.index}&start=${currentTime}&_v=${Date.now()}`;
-                            
-                            art.notice.show = '오디오 트랙 변경 중... ⏳';
-                            
-                            // switchUrl로 깔끔하게 전환
-                            art.switchUrl(newUrl).then(() => {
-                                art.play();
-                            });
-                            
-                            return item.html;
-                        },
-                    }
-                ],
-            });
-        } else if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
-            container.innerHTML = `<img src="${viewUrl}" class="preview-img" style="max-width:100%; max-height:100%; object-fit:contain;">`;
-        } else if (ext === '.pdf' || ext === '.txt') {
-            container.innerHTML = `<iframe src="${viewUrl}" style="width:100%; height:100%; border:none; background:white; border-radius:12px;"></iframe>`;
+            if (adminPassword) {
+                sidebarHtml += `
+                    <div style="margin: 20px 0; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                        <p style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">Admin Tools</p>
+                        <div class="action-group">
+                            <button class="btn" onclick="renameItem('${path}')"><i data-lucide="edit-3"></i><span>Rename</span></button>
+                            <button class="btn" onclick="deleteItem('${path}')" style="color: #ef4444; border-color: #fecaca;"><i data-lucide="trash-2"></i><span>Delete</span></button>
+                        </div>
+                    </div>
+                `;
+            }
+            sidebarHtml += `</div>`;
+            sidebar.innerHTML = sidebarHtml;
+
+            // 3. 파일 타입별 렌더링
+            try {
+                if (['.mp4', '.mkv', '.webm', '.mov'].includes(ext)) {
+                    container.innerHTML = `<div class="artplayer-app" style="width:100%; height:100%;"></div>`;
+                    
+                    const infoRes = await fetch(`/api/media-info?path=${encodeURIComponent(path)}`);
+                    const info = await infoRes.json();
+                    const streams = info.streams || [];
+
+                    const subtitleTracks = streams
+                        .filter(s => s.type === 'subtitle')
+                        .map(s => ({
+                            html: `[자막 ${s.index}] ${s.title || 'Subtitle'} (${s.language || 'und'})`,
+                            url: `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`,
+                            name: `sub_${s.index}`
+                        }));
+
+                    const audioTracks = streams
+                        .filter(s => s.type.toLowerCase() === 'audio')
+                        .map(s => ({
+                            html: `[오디오 ${s.index}] ${s.title || 'Audio'} (${s.language || 'und'})`,
+                            index: s.index,
+                            name: `aud_${s.index}`
+                        }));
+
+                    // Artplayer 초기화
+                    art = new Artplayer({
+                        container: '.artplayer-app',
+                        url: viewUrl,
+                        type: 'mp4',
+                        title: fileName,
+                        autoplay: true,
+                        setting: true,
+                        playbackRate: true,
+                        aspectRatio: true,
+                        pip: true,
+                        fullscreen: true,
+                        fullscreenWeb: true,
+                        theme: '#4f46e5',
+                        lastSeen: true, // 요걸 꼭 true로 해줘야 함! 💡
+                        storage: true, // 로컬 스토리지에 재생 기록 저장 필수
+                        subtitle: subtitleTracks.length > 0 ? {
+                            url: subtitleTracks[0].url,
+                            type: 'srt',
+                            encoding: 'utf-8',
+                            style: {
+                                color: '#ffffff',
+                                fontSize: '32px',
+                                textShadow: '0 0 4px rgba(0, 0, 0, 0.8)',
+                            },
+                        } : {},
+                        settings: [
+                            {
+                                width: 250,
+                                html: '자막',
+                                tooltip: subtitleTracks.length > 0 ? '선택 가능' : '없음',
+                                selector: [{ html: '자막 끄기', url: '' }, ...subtitleTracks],
+                                onSelect: function (item) {
+                                    if (item.url) art.subtitle.switch(item.url, { name: item.name, type: 'srt' });
+                                    else art.subtitle.show = false;
+                                    return item.html;
+                                },
+                            },
+                            {
+                                html: '자막 크기',
+                                width: 250,
+                                selector: [
+                                    {
+                                        default: false,
+                                        html: '작음',
+                                        fontSize: '24px',
+                                    },
+                                    {
+                                        default: true,
+                                        html: '중간',
+                                        fontSize: '32px',
+                                    },
+                                    {
+                                        default: false,
+                                        html: '큼',
+                                        fontSize: '48px',
+                                    },
+                                ],
+                                onSelect: function (item){
+                                                        // 자막 스타일 업데이트
+                                    art.subtitle.style({
+                                        fontSize: item.fontSize,
+                                    });
+                                    return item.html;
+                                },
+
+                            },
+                            {
+                                width: 250,
+                                html: '오디오 트랙',
+                                tooltip: audioTracks.length > 0 ? '선택 가능' : '기본',
+                                selector: audioTracks,
+                                onSelect: function (item) {
+                                    const currentTime = art.currentTime;
+                                    // 서버에 현재 시간을 전달해서 거기서부터 렌더링하도록 요청
+                                    const newUrl = `/api/view?path=${encodeURIComponent(path)}&audio_index=${item.index}&start=${currentTime}&_v=${Date.now()}`;
+                                    
+                                    art.notice.show = '오디오 트랙 변경 중... ⏳';
+                                    
+                                    // switchUrl로 깔끔하게 전환
+                                    art.switchUrl(newUrl).then(() => {
+                                        art.play();
+                                    });
+                                    
+                                    return item.html;
+                                },
+                            },
+                        ],
+                    });
+                } else if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+                    container.innerHTML = `<img src="${viewUrl}" class="preview-img" style="max-width:100%; max-height:100%; object-fit:contain;">`;
+                } else if (ext === '.pdf' || ext === '.txt') {
+                    container.innerHTML = `<iframe src="${viewUrl}" style="width:100%; height:100%; border:none; background:white; border-radius:12px;"></iframe>`;
+                }
+            } catch (err) {
+                console.error("미디어 렌더링 오류:", err);
+                container.innerHTML = `<video src="${viewUrl}" controls autoplay style="width:100%; max-height:100%;"></video>`;
+            }
+
+            modal.style.display = 'block';
+            lucide.createIcons();
         }
-    } catch (err) {
-        console.error("미디어 렌더링 오류:", err);
-        container.innerHTML = `<video src="${viewUrl}" controls autoplay style="width:100%; max-height:100%;"></video>`;
-    }
-
-    modal.style.display = 'block';
-    lucide.createIcons();
-}
 
         async function renameItem(path) {
             const oldName = path.split('/').pop();
