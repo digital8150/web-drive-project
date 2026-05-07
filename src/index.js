@@ -23,12 +23,11 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         const safeName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        cb(null, Date.now() + '-' + safeName);
+        cb(null, safeName);
     }
 });
 const upload = multer({ 
-    storage,
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+    storage
 });
 
 app.use(express.json());
@@ -68,25 +67,63 @@ app.get('/api/media-info', (req, res) => {
                 type: s.codec_type,
                 codec: s.codec_name,
                 language: s.tags ? s.tags.language : 'unknown',
-                title: s.tags ? s.tags.title : (s.codec_type + ' ' + s.index)
+                title: s.tags ? s.tags.title : (s.codec_type + ' ' + s.index),
+                isExternal: false
             }));
 
-            res.json({ streams });
+            // Check for external subtitle files
+            const dir = path.dirname(targetPath);
+            const fileName = path.basename(targetPath, path.extname(targetPath));
+            const externalSubs = [];
+            
+            for (const ext of ['.srt', '.smi']) {
+                const subPath = path.join(dir, fileName + ext);
+                if (fs.existsSync(subPath)) {
+                    externalSubs.push({
+                        index: -1,
+                        type: 'subtitle',
+                        codec: ext.substring(1).toLowerCase(),
+                        language: 'external',
+                        title: `External ${ext.substring(1).toUpperCase()}`,
+                        isExternal: true
+                    });
+                }
+            }
+
+            res.json({ streams: [...streams, ...externalSubs] });
         });
     } catch (err) {
         res.status(403).json({ error: err.message });
     }
 });
 
-// API: Subtitle Extraction (SRT)
+// API: Subtitle Extraction (SRT or External Files)
 app.get('/api/subtitle', (req, res) => {
     try {
         const filePath = req.query.path;
-        const trackIndex = req.query.index;
+        const trackIndex = parseInt(req.query.index);
+        const isExternal = req.query.external === 'true';
+        
         if (!filePath || trackIndex === undefined) return res.status(400).json({ error: 'Path and index are required' });
 
         const targetPath = resolvePath(filePath);
         
+        // External subtitle file
+        if (isExternal) {
+            const dir = path.dirname(targetPath);
+            const fileName = path.basename(targetPath, path.extname(targetPath));
+            
+            for (const ext of ['.srt', '.smi']) {
+                const subPath = path.join(dir, fileName + ext);
+                if (fs.existsSync(subPath)) {
+                    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+                    return fs.createReadStream(subPath).pipe(res);
+                }
+            }
+            return res.status(404).json({ error: 'Subtitle file not found' });
+        }
+        
+        // Embedded subtitle stream from video
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         ffmpeg(targetPath)
             .outputOptions([`-map 0:${trackIndex}`, '-f srt'])
@@ -360,11 +397,6 @@ app.get('/api/status', (req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
-    if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'File size too large (Limit: 100MB)' });
-        }
-    }
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 

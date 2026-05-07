@@ -548,6 +548,79 @@
             color: var(--primary);
         }
 
+        #uploadToast {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            width: 340px;
+            max-width: calc(100vw - 32px);
+            background: rgba(15, 23, 42, 0.96);
+            color: #f8fafc;
+            border-radius: 18px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.35);
+            padding: 16px;
+            display: none;
+            z-index: 600;
+            backdrop-filter: blur(12px);
+            font-size: 0.9rem;
+        }
+
+        #uploadToast.active {
+            display: block;
+        }
+
+        #uploadToast .upload-toast-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        #uploadToast .upload-toast-title span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        #uploadToast .upload-toast-close {
+            background: transparent;
+            border: none;
+            color: #cbd5e1;
+            cursor: pointer;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 0;
+        }
+
+        #uploadToast .upload-progress-bar {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        #uploadToast .upload-progress-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #60a5fa, #4f46e5);
+            transition: width 0.2s ease;
+        }
+
+        #uploadToast .upload-progress-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: #cbd5e1;
+        }
+
         /* Custom Dialog Modals */
         .dialog-overlay {
             display: none;
@@ -756,7 +829,7 @@
                 </div>
                 <div class="search-box">
                     <i data-lucide="search" class="icon"></i>
-                    <input type="text" placeholder="Search files..." oninput="handleSearch(this.value)" autocomplete="off" spellcheck="false">
+                    <input type="search" placeholder="Search files..." oninput="handleSearch(this.value)" autocomplete="off" spellcheck="false">
                 </div>
             </div>
             <div class="header-right">
@@ -839,6 +912,8 @@
         <div class="admin-modal">
             <h2>Admin Login</h2>
             <div class="form-group">
+                <label>ID</label>
+                <input type="text" id="adminUsername" placeholder="Enter admin ID">
                 <label>Password</label>
                 <input type="password" id="adminPassword" placeholder="Enter admin password">
             </div>
@@ -862,6 +937,20 @@
                 <button id="dialogCancel" class="btn">Cancel</button>
                 <button id="dialogConfirm" class="btn btn-primary">Confirm</button>
             </div>
+        </div>
+    </div>
+
+    <div id="uploadToast">
+        <div class="upload-toast-title">
+            <span id="uploadToastTitle">Uploading file...</span>
+            <button type="button" class="upload-toast-close" onclick="hideUploadToast()" aria-label="Close">×</button>
+        </div>
+        <div class="upload-progress-bar">
+            <div id="uploadProgressFill" class="upload-progress-fill"></div>
+        </div>
+        <div class="upload-progress-meta">
+            <span id="uploadProgressPercent">0%</span>
+            <span id="uploadProgressStatus">Preparing...</span>
         </div>
     </div>
 
@@ -1205,19 +1294,74 @@
             if (file) uploadFile(file);
         }
 
+        function showUploadToast(fileName) {
+            const toast = document.getElementById('uploadToast');
+            document.getElementById('uploadToastTitle').textContent = fileName || 'Uploading file...';
+            document.getElementById('uploadProgressFill').style.width = '0%';
+            document.getElementById('uploadProgressPercent').textContent = '0%';
+            document.getElementById('uploadProgressStatus').textContent = 'Waiting...';
+            toast.classList.add('active');
+        }
+
+        function updateUploadProgress(loaded, total) {
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            document.getElementById('uploadProgressFill').style.width = `${percent}%`;
+            document.getElementById('uploadProgressPercent').textContent = `${percent}%`;
+            document.getElementById('uploadProgressStatus').textContent = `${formatSize(loaded)} / ${formatSize(total)}`;
+        }
+
+        function hideUploadToast() {
+            const toast = document.getElementById('uploadToast');
+            toast.classList.remove('active');
+        }
+
         async function uploadFile(file) {
             const formData = new FormData();
             formData.append('file', file);
-            try {
-                const response = await fetch(`/api/upload?path=${encodeURIComponent(currentPath)}`, {
-                    method: 'POST',
-                    headers: { 'x-admin-password': adminPassword },
-                    body: formData
-                });
-                const data = await response.json();
-                if (data.error) await showDialog({ title: 'Error', message: data.error });
-                else fetchFiles(currentPath);
-            } catch (err) { console.error('Upload failed', err); }
+            showUploadToast(file.name);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/api/upload?path=${encodeURIComponent(currentPath)}`);
+            xhr.setRequestHeader('x-admin-password', adminPassword);
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    updateUploadProgress(event.loaded, event.total);
+                }
+            };
+
+            xhr.onloadstart = () => {
+                document.getElementById('uploadProgressStatus').textContent = 'Uploading...';
+            };
+
+            xhr.onload = async () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText || '{}');
+                        if (data.error) {
+                            await showDialog({ title: 'Upload Error', message: data.error });
+                        } else {
+                            updateUploadProgress(file.size, file.size);
+                            document.getElementById('uploadProgressStatus').textContent = 'Completed';
+                            fetchFiles(currentPath);
+                        }
+                    } catch (err) {
+                        console.error('Upload response parse failed', err);
+                        await showDialog({ title: 'Upload Error', message: 'Unexpected server response.' });
+                    }
+                } else {
+                    await showDialog({ title: 'Upload Error', message: `Upload failed (${xhr.status})` });
+                }
+            };
+
+            xhr.onerror = async () => {
+                await showDialog({ title: 'Upload Error', message: 'Network error during upload.' });
+            };
+
+            xhr.onloadend = () => {
+                setTimeout(hideUploadToast, 1200);
+            };
+
+            xhr.send(formData);
         }
 
         async function previewSelectedItem() {
@@ -1289,11 +1433,17 @@
 
                     const subtitleTracks = streams
                         .filter(s => s.type === 'subtitle')
-                        .map(s => ({
-                            html: `[자막 ${s.index}] ${s.title || 'Subtitle'} (${s.language || 'und'})`,
-                            url: `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`,
-                            name: `sub_${s.index}`
-                        }));
+                        .map(s => {
+                            let url = `/api/subtitle?path=${encodeURIComponent(path)}&index=${s.index}`;
+                            if (s.isExternal) {
+                                url += '&external=true';
+                            }
+                            return {
+                                html: `${s.isExternal ? '[외부]' : '[내장]'} ${s.title || 'Subtitle'} (${s.language || 'und'})`,
+                                url: url,
+                                name: `sub_${s.index}`
+                            };
+                        });
 
                     const audioTracks = streams
                         .filter(s => s.type.toLowerCase() === 'audio')
